@@ -17,6 +17,14 @@ async def index(request: Request):
         name='index.html',
     )
 
+@app.get('/login', response_class=HTMLResponse)
+async def login(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name='login.html',
+    )
+
+
 if __name__ == '__main__':
     uvicorn.run("main:app", host='127.0.0.1', port=8080, reload=True)
 
@@ -24,3 +32,6 @@ if __name__ == '__main__':
 # So added jinja2 and template stuff
 # internal server error always means an internal python error inside of the function that 
 # corresponds to the rout or page that was connected
+
+# For trying to make new stuff (like modifying stuff in multiple places)
+# Make the menu just be in one place! Use jinja templating
