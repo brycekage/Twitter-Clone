@@ -1,6 +1,12 @@
 {% extends 'base.html' %}
-<!-- Extends in jinja is like include in python-->
-
 {% block content %}
-<h2>This is the Main Page.</h2>
+<h2>Recent Messages</h2>
+<img src="/static/twitter.png" alt="Twitter Clone" width="100">
+{% for msg in messages %}
+<div>
+    <b>{{ msg.username }}</b> (age {{ msg.age }}) — {{ msg.created_at }}<br>
+    {{ msg.message }}
+    <hr>
+</div>
+{% endfor %}
 {% endblock %}

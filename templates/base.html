@@ -1,6 +1,7 @@
 <html>
     <head>
         <title>Twitter Clone</title>
+        <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
     </head>
     <body>
         <h1>Twitter Clone</h1>
@@ -13,17 +14,12 @@
             -->
             {% if is_logged_in %}
             <li><a href='/logout'>Logout</a></li>
-            <li><a href='/create message'>Create Message</a></li>
-            <li><a href='/delete message'>Delete Message</a></li>                        
+            <li><a href='/create_message'>Create Message</a></li>
             {% else %}
             <li><a href='/login'>Login</a></li>
-            <li><a href='/create user'>Create User</a></li>              
-            {% endif %}                                                        
+            <li><a href='/create_user'>Create User</a></li>
+            {% endif %}
         </ul>
-        {#
-            This is a jinja2 comment
-            anything in {% %} is jinja2 code
-        #}
         {% block content %}
         {% endblock %}
     </body>

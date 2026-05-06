@@ -1,7 +1,6 @@
 {% extends 'base.html' %}
-<!-- Extends in jinja is like include in python-->
 {% block content %}
-<h2>Login</h2>
+<h2>Create User</h2>
 {% if error %}
 <p style="color:red;">{{ error }}</p>
 {% endif %}
@@ -9,7 +8,8 @@
     <table>
         <tr><td>Username:</td><td><input name="username"></td></tr>
         <tr><td>Password:</td><td><input name="password" type="password"></td></tr>
-        <tr><td></td><td><input type="submit" value="Login"></td></tr>
+        <tr><td>Age:</td><td><input name="age" type="number"></td></tr>
+        <tr><td></td><td><input type="submit" value="Create"></td></tr>
     </table>
 </form>
 {% endblock %}
