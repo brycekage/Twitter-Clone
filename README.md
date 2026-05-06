@@ -4,4 +4,4 @@ A "definitely not highly inspired by Twitter" web app built using FastAPI, Jinja
 
 ## Screenshot
 
-![Home Page](twitCLoneSS.png)
+![Home Page](twitCloneSS.png)
