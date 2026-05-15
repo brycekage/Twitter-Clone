@@ -1,3 +1,9 @@
 fastapi
 uvicorn
 jinja2
+python-multipart
+passlib[bcrypt]
+itsdangerous
+markdown
+bleach
+python-dotenv
