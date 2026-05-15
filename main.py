@@ -468,7 +468,7 @@ async def home(request: Request, page: int = 1):
     FROM messages m
     JOIN message_tree mt ON m.id = mt.id
     LEFT JOIN users u ON m.user_id = u.id
-    ORDER BY mt.root_id DESC, mt.depth ASC, m.id ASC
+    ORDER BY m.timestamp DESC, mt.depth ASC, m.id ASC
     LIMIT ? OFFSET ?
     """, (limit, offset)).fetchall()
 
