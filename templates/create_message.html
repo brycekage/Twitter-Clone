@@ -1,16 +1,16 @@
 {% extends 'base.html' %}
 {% block content %}
-<h2>Create Message</h2>
-<form method="post">
-    <table>
-        <tr>
-            <td>Message:</td>
-            <td><textarea name="message" rows="4" cols="50"></textarea></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td><input type="submit" value="Post"></td>
-        </tr>
-    </table>
-</form>
+<h2>Create Twot</h2>
+<div>
+    <h2>What do you want to say?</h2>
+    
+    <form action="/create_message" method="post">
+        <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token') }}">
+        <textarea name="content" required></textarea>
+        
+        <button type="submit">
+            Post Twot
+        </button>
+    </form>
+</div>
 {% endblock %}

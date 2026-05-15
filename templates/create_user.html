@@ -4,12 +4,20 @@
 {% if error %}
 <p style="color:red;">{{ error }}</p>
 {% endif %}
-<form method="post">
-    <table>
-        <tr><td>Username:</td><td><input name="username"></td></tr>
-        <tr><td>Password:</td><td><input name="password" type="password"></td></tr>
-        <tr><td>Age:</td><td><input name="age" type="number"></td></tr>
-        <tr><td></td><td><input type="submit" value="Create"></td></tr>
-    </table>
+<h2>Create Account</h2>
+
+<form action="/create_user" method="post">
+    <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token') }}">
+    
+    <input type="text" name="username" placeholder="Username" required>
+
+    <input type="password" name="password" placeholder="Password" required>
+
+    <input type="password" name="p2" placeholder="Confirm Password" required>
+
+    <input type="number" name="age" placeholder="Age" required>
+
+    <button type="submit">Register</button>
+
 </form>
 {% endblock %}

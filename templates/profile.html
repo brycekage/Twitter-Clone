@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TNT - @{{ profile_user.username }}</title>
+    <style>
+        :root {
+            --capy-tan: #c8a97e;
+            --capy-brown: #7a5c3e;
+            --capy-dark: #4a3728;
+            --capy-light: #f5ede0;
+            --capy-cream: #fdf6ee;
+            --capy-border: #ddc9b0;
+            --nav-text: #5a4030;
+        }
+
+        body {
+            background-color: var(--capy-cream);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #3a2e24;
+        }
+
+        header {
+            background-color: var(--capy-light);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--capy-border);
+            text-align: center;
+        }
+
+        .birdie-header {
+            background-color: var(--capy-light);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--capy-border);
+            text-align: center;
+        }
+
+        .logo,
+        .main-logo {
+            width: 60px;
+            height: auto;
+            margin-bottom: 5px;
+        }
+
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin: 5px 0;
+            font-weight: 800;
+            color: var(--capy-dark);
+        }
+
+        .title-nav nav {
+            margin: 10px 0;
+            font-weight: 600;
+        }
+
+        nav a,
+        .title-nav nav a {
+            text-decoration: none;
+            color: var(--nav-text);
+            margin: 0 15px;
+            font-weight: 600;
+        }
+
+        nav a:hover,
+        .title-nav nav a:hover {
+            color: var(--capy-brown);
+        }
+
+        .lang-nav {
+            font-size: 0.75em;
+            color: #a08060;
+            margin-bottom: 10px;
+        }
+
+        .lang-nav a {
+            color: #a08060;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+
+        .lang-nav a:hover {
+            color: var(--capy-brown);
+        }
+
+        .search-row {
+            margin-top: 12px;
+        }
+
+        .search-row input {
+            padding: 10px 15px;
+            width: 260px;
+            border-radius: 20px;
+            border: 2px solid var(--capy-tan);
+            outline: none;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-row input:focus {
+            box-shadow: 0 0 8px rgba(122, 92, 62, 0.25);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .chirp-card {
+            background: white;
+            border: 1px solid var(--capy-border);
+            border-radius: 20px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .is-reply {
+            margin-left: 50px;
+            border-left: 4px solid var(--capy-border);
+            background: var(--capy-light);
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .avatar-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid var(--capy-tan);
+        }
+
+        .avatar-reply {
+            width: 35px;
+            height: 35px;
+        }
+
+        .username {
+            color: var(--capy-brown);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .message-content {
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+
+        .timestamp,
+        .bio-text {
+            color: #a08060;
+            font-size: 0.8em;
+            font-family: inherit;
+        }
+
+        .actions-bar {
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+            font-family: inherit;
+        }
+
+        .btn-action {
+            text-decoration: none;
+            font-size: 0.8em;
+            color: #a08060;
+            font-weight: 600;
+            font-family: inherit;
+        }
+
+        .btn-action:hover {
+            color: var(--capy-brown);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 40px 0;
+            font-family: inherit;
+        }
+
+        .bottom-tools {
+            max-width: 800px;
+            margin: 60px auto 40px auto;
+            padding: 0 20px;
+            font-family: inherit;
+            font-size: 0.8em;
+            color: #a08060;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .bottom-tools a {
+            color: #a08060;
+            text-decoration: none;
+        }
+
+        .bottom-tools a:hover {
+            color: var(--capy-brown);
+        }
+
+        /* ── Profile Page ── */
+
+        .profile-card {
+            background: white;
+            border-radius: 30px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: 0 10px 25px rgba(74, 55, 40, 0.08);
+            margin-bottom: 30px;
+            border: 1px solid var(--capy-border);
+        }
+
+        .avatar-large {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 5px solid var(--capy-brown);
+            background-color: #fff;
+            padding: 5px;
+            margin-bottom: 15px;
+        }
+
+        .bio-display {
+            background: var(--capy-light);
+            padding: 20px;
+            border-radius: 20px;
+            font-style: italic;
+            color: #6b4f38;
+            margin: 20px 0;
+            border: 1px dashed var(--capy-border);
+        }
+
+        .bio-edit-form textarea {
+            width: 100%;
+            height: 80px;
+            border-radius: 15px;
+            border: 1px solid var(--capy-border);
+            padding: 15px;
+            font-family: inherit;
+            resize: none;
+            margin-bottom: 10px;
+            box-sizing: border-box;
+            background: var(--capy-cream);
+            color: #3a2e24;
+        }
+
+        .bio-edit-form textarea:focus {
+            outline: none;
+            box-shadow: 0 0 8px rgba(122, 92, 62, 0.25);
+        }
+
+        .save-btn {
+            background-color: var(--capy-brown);
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            border-radius: 10px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .save-btn:hover {
+            background-color: var(--capy-dark);
+        }
+
+        .msg-card {
+            background: white;
+            padding: 20px;
+            border-radius: 20px;
+            margin-bottom: 15px;
+            border: 1px solid var(--capy-border);
+        }
+
+        .mention {
+            color: var(--capy-brown);
+            background-color: var(--capy-light);
+            padding: 2px 4px;
+            border-radius: 4px;
+            font-weight: bold;
+            text-decoration: none;
+        }
+    </style>
+</head>
+    <body>
+        <header class="birdie-header">
+        <div class="logo-container">
+            <img src="/static/capy.jpg" class="main-logo">
+
+            <div class="title-nav">
+                <h1>TNT</h1>
+
+                <div class="lang-nav">
+                    <a href="/set_lang/en">EN</a> |
+                    <a href="/set_lang/fr">FR</a> |
+                    <a href="/set_lang/zh">中文</a>
+                </div>
+
+                <nav>
+                    <a href="/">{{ t.home }}</a>
+                    {% if user %}
+                        <a href="/create_message">+ {{ t.post }}</a>
+                        <a href="/profile/{{ user }}">{{ t.profile }}</a>
+                        <a href="/logout">{{ t.logout }}</a>
+                    {% else %}
+                        <a href="/login">{{ t.login }}</a>
+                        <a href="/register">{{ t.register }}</a>
+                    {% endif %}
+                </nav>
+
+                <div class="search-row">
+                    <form action="/search" method="get">
+                        <input type="text" name="q" placeholder="{{ t.search_placeholder }}">
+                    </form>
+                </div>
+
+            </div>
+        </div>
+    </header>
+
+    <div class="container">
+        <div class="profile-card">
+            <img src="https://robohash.org/{{ profile_user.username }}?set=set4&size=120x120" class="avatar-large">
+            <h2 style="color: var(--birdie-dark-pink); margin:0;">@{{ profile_user.username }}</h2>
+            <p>{{ profile_user.age }} years old</p>
+
+            <div class="bio-display">
+                {% if profile_user.bio %}"{{ profile_user.bio }}"{% else %}"No bio yet..."{% endif %}
+            </div>
+
+            {% if is_own_profile %}
+                <div class="bio-edit-form">
+                    <form action="/update_profile" method="post">
+                        <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token') }}">
+                        <textarea name="bio" placeholder="Update your bio...">{{ profile_user.bio or '' }}</textarea>
+                        <button type="submit" class="save-btn">Save Bio</button>
+                    </form>
+                </div>
+            {% endif %}
+        </div>
+
+        <h3 style="border-left: 5px solid var(--birdie-dark-pink); padding-left: 10px; padding-right: 10px">Twots</h3>
+        {% for msg in messages %}
+            <div class="msg-card">
+                <div>{{ linkify(msg.content) | safe }}</div>
+                <small style="color: #ccc;">{{ msg.timestamp }}</small>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="bottom-tools">
+    <a href="/api/messages">API: /api/messages</a>
+    <a href="/delete_account">Delete Account</a>
+    <a href="/change_password">Change Password</a>
+</div>
+</body>
+</html>

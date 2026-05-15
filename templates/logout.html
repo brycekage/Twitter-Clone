@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block content %}
+    <h2>Logout</h2>
+
+    <p>Are you sure you want to log out of your account?</p>
+
+    <form action="/logout" method="post">
+        <input type="hidden" name="csrf_token" value="{{ request.cookies.get('csrf_token') }}">
+        <button type="submit">Yes, Log Me Out</button>
+        <a href="/">No, Take Me Back Home</a>
+    </form>
+{% endblock %}

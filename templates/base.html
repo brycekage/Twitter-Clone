@@ -1,25 +1,247 @@
-<html>
-    <head>
-        <title>Twitter Clone</title>
-        <link rel="stylesheet" href="{{ url_for('static', path='styles.css') }}">
-    </head>
-    <body>
-        <h1>Twitter Clone</h1>
-        <ul>
-            <li><a href='/'>Home</a></li>
-            <!--  Jinja is a templating language
-                everything by default is a string
-                and the language specific commands have a specialty syntax
-                There are no special commands to build strings
-            -->
-            {% if is_logged_in %}
-            <li><a href='/logout'>Logout</a></li>
-            {% else %}
-            <li><a href='/login'>Login</a></li>
-            <li><a href='/create_user'>Create User</a></li>
-            {% endif %}
-        </ul>
-        {% block content %}
-        {% endblock %}
-    </body>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TNT (Totally Not Twitter)</title>
+    
+    <style>
+        :root {
+            --capy-tan: #c8a97e;
+            --capy-brown: #7a5c3e;
+            --capy-dark: #4a3728;
+            --capy-light: #f5ede0;
+            --capy-cream: #fdf6ee;
+            --capy-border: #ddc9b0;
+            --nav-text: #5a4030;
+        }
+
+        body {
+            background-color: var(--capy-cream);
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            color: #3a2e24;
+        }
+
+        header {
+            background-color: var(--capy-light);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--capy-border);
+            text-align: center;
+        }
+
+        .birdie-header {
+            background-color: var(--capy-light);
+            padding: 20px 0;
+            border-bottom: 2px solid var(--capy-border);
+            text-align: center;
+        }
+
+        .logo,
+        .main-logo {
+            width: 60px;
+            height: auto;
+            margin-bottom: 5px;
+        }
+
+        .logo-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            font-size: 32px;
+            margin: 5px 0;
+            font-weight: 800;
+            color: var(--capy-dark);
+        }
+
+        .title-nav nav {
+            margin: 10px 0;
+            font-weight: 600;
+        }
+
+        nav a,
+        .title-nav nav a {
+            text-decoration: none;
+            color: var(--nav-text);
+            margin: 0 15px;
+            font-weight: 600;
+        }
+
+        nav a:hover,
+        .title-nav nav a:hover {
+            color: var(--capy-brown);
+        }
+
+        .lang-nav {
+            font-size: 0.75em;
+            color: #a08060;
+            margin-bottom: 10px;
+        }
+
+        .lang-nav a {
+            color: #a08060;
+            text-decoration: none;
+            margin: 0 6px;
+        }
+
+        .lang-nav a:hover {
+            color: var(--capy-brown);
+        }
+
+        .search-row {
+            margin-top: 12px;
+        }
+
+        .search-row input {
+            padding: 10px 15px;
+            width: 260px;
+            border-radius: 20px;
+            border: 2px solid var(--capy-tan);
+            outline: none;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-row input:focus {
+            box-shadow: 0 0 8px rgba(122, 92, 62, 0.25);
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 30px auto;
+            padding: 0 20px;
+        }
+
+        .chirp-card {
+            background: white;
+            border: 1px solid var(--capy-border);
+            border-radius: 20px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .is-reply {
+            margin-left: 50px;
+            border-left: 4px solid var(--capy-border);
+            background: var(--capy-light);
+            border-top-left-radius: 0;
+            border-bottom-left-radius: 0;
+        }
+
+        .avatar-circle {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 2px solid var(--capy-tan);
+        }
+
+        .avatar-reply {
+            width: 35px;
+            height: 35px;
+        }
+
+        .username {
+            color: var(--capy-brown);
+            font-weight: bold;
+            text-decoration: none;
+        }
+
+        .message-content {
+            margin-top: 5px;
+            line-height: 1.5;
+        }
+
+        .timestamp,
+        .bio-text {
+            color: #a08060;
+            font-size: 0.8em;
+            font-family: inherit;
+        }
+
+        .actions-bar {
+            margin-top: 10px;
+            display: flex;
+            gap: 15px;
+            font-family: inherit;
+        }
+
+        .btn-action {
+            text-decoration: none;
+            font-size: 0.8em;
+            color: #a08060;
+            font-weight: 600;
+            font-family: inherit;
+        }
+
+        .btn-action:hover {
+            color: var(--capy-brown);
+        }
+
+        .pagination {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin: 40px 0;
+            font-family: inherit;
+        }
+
+        .bottom-tools {
+            max-width: 800px;
+            margin: 60px auto 40px auto;
+            padding: 0 20px;
+            font-family: inherit;
+            font-size: 0.8em;
+            color: #a08060;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .bottom-tools a {
+            color: #a08060;
+            text-decoration: none;
+        }
+
+        .bottom-tools a:hover {
+            color: var(--capy-brown);
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+    <img src="/static/capy.jpg" class="logo">
+    <h1>TNT (Totally Not Twitter)</h1>
+
+    <nav>
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/create_message">Post</a>
+            <a href="/profile/{{ user }}">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Login</a>
+            <a href="/register">Register</a>
+        {% endif %}
+        <div class="search-row">
+                    <form action="/search" method="get">
+                        <input type="text" name="q" placeholder="{{ t.search_placeholder }}">
+                    </form>
+                </div>
+    </nav>
+</header>
+
+<div class="container">
+    {% block content %}{% endblock %}
+</div>
+
+</body>
 </html>

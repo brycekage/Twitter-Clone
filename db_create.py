@@ -7,18 +7,17 @@ def ensure_schema():
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
 
-    # make sure users table exists first (safe even if already created)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE,
             password TEXT,
             age INTEGER,
-            bio TEXT
+            bio TEXT,
+            avatar TEXT
         )
     """)
 
-    # messages table (unchanged)
     cur.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -29,6 +28,12 @@ def ensure_schema():
             parent_id INTEGER DEFAULT NULL
         )
     """)
+
+    # Add avatar column if missing (for existing databases)
+    cur.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "avatar" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN avatar TEXT")
 
     conn.commit()
     conn.close()

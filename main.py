@@ -5,20 +5,22 @@ from fastapi.staticfiles import StaticFiles
 from passlib.hash import pbkdf2_sha256
 from itsdangerous import URLSafeTimedSerializer
 from fastapi.responses import JSONResponse
+from functools import wraps
+from collections import defaultdict
 
 import sqlite3
 import os
 import re
-import html
+import secrets
 import markdown
 from datetime import datetime
 import bleach
 import random
+import time
 DB_PATH = "database.db"
 
 
-##############################
-# App Setup
+### APP SETUP
 
 app = FastAPI()
 
@@ -26,10 +28,72 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 
 DB_PATH = os.path.join(os.path.dirname(__file__), "database.db")
+RATE_LIMIT = defaultdict(list)
+FTS_INITIALIZED = False
 
-SECRET_KEY = "your-super-secret-key-12345"
+SECRET_KEY = os.environ.get(
+    "SECRET_KEY",
+    secrets.token_urlsafe(64)
+)
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 
+def generate_csrf():
+    return secrets.token_urlsafe(32)
+
+@app.middleware("http")
+async def csrf_cookie_middleware(request: Request, call_next):
+    response = await call_next(request)
+
+    if not request.cookies.get("csrf_token"):
+        response.set_cookie(
+            "csrf_token",
+            generate_csrf(),
+            httponly=True,
+            samesite="lax"
+        )
+
+    return response
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "img-src 'self' https://robohash.org data:; "
+        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "frame-ancestors 'none';"
+    )
+
+    return response
+
+
+def csrf_required(func):
+    @wraps(func)
+    async def wrapper(*args, **kwargs):
+        request = kwargs.get("request") or args[0]
+
+        form = await request.form()
+        form_token = form.get("csrf_token")
+        cookie_token = request.cookies.get("csrf_token")
+
+        if not cookie_token or not form_token:
+            return HTMLResponse("CSRF missing", 403)
+
+        if not secrets.compare_digest(str(cookie_token), str(form_token)):
+            return HTMLResponse("CSRF invalid", 403)
+
+        return await func(*args, **kwargs)
+
+    return wrapper
 def get_current_user_id(request: Request):
     signed_user = request.cookies.get("user_id")
 
@@ -43,11 +107,33 @@ def get_current_user_id(request: Request):
     except Exception:
         return None
 
-###############################
-# JSON API
+def set_auth_cookies(response, user_id, username):
+    signed_user_id = serializer.dumps(user_id)
+
+    response.set_cookie(
+        "user_id",
+        signed_user_id,
+        httponly=True,
+        secure=False ,
+        samesite="lax",
+        max_age=604800
+    )
+
+    response.set_cookie(
+        "username",
+        username,
+        httponly=True,
+        secure=False,
+        samesite="lax",
+        max_age=604800
+    )
+
+
+### JSON API
 
 @app.get("/api/messages")
-async def api_messages(page: int = 1):
+async def api_messages(page: 
+    int = 1):
     if page < 1:
         page = 1
 
@@ -71,7 +157,7 @@ async def api_messages(page: int = 1):
     for r in rows:
         messages.append({
             "id": r["id"],
-            "username": r["username"],
+            "username": r["username"] or "Deleted User",
             "content": r["content"],
             "timestamp": r["timestamp"],
             "edited_at": r["edited_at"]
@@ -82,8 +168,8 @@ async def api_messages(page: int = 1):
         "messages": messages
     })
 
-#########################################
-# Language Support
+
+### Language Support
 
 LANGUAGES = {
     "en": {
@@ -168,34 +254,25 @@ async def set_language(lang: str):
         response.set_cookie(key="language", value=lang, max_age=2592000)
     return response
 
-# This allows you to just type {{ t.home }} in ANY template 
-# as long as you pass the request in the context.
-@app.middleware("http")
-async def add_translations_to_request(request: Request, call_next):
-    request.state.t = get_translations(request)
-    response = await call_next(request)
-    return response
-
-# Update your globals to use the state
 templates.env.globals["get_t"] = get_translations
 
-#########################################
-# DB Connection
-# Creates a safe SQLite connection
+
+### Database Connection
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
 
     conn.execute("""
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            username TEXT UNIQUE,
-            password TEXT,
-            age INTEGER,
-            bio TEXT
-        )
-    """)
+    CREATE TABLE IF NOT EXISTS users (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        username TEXT UNIQUE,
+        password TEXT,
+        age INTEGER,
+        bio TEXT,
+        avatar TEXT
+    )
+""")
 
     conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
@@ -241,14 +318,14 @@ def ensure_bio_column():
     conn.close()
 
 DEFAULT_BIOS = [
-    "Just vibing on BirdieMessages 🐦",
-    "CS student grinding assignments 💻",
-    "Professional procrastinator",
-    "Surviving college one bug at a time",
-    "Debugging my life like my code",
-    "Coffee enthusiast ☕",
-    "Learning and building things",
-    "Here for the memes"
+    "TNT to the MOON!!!",
+    "Merp",
+    "Still thinking about what 67 means",
+    "So happy that I'm not Bryce RN",
+    "RAAHHHHHH",
+    "building krypton ai",
+    "Maintaining shareholder equity",
+    "backflip, kickflip, what's pip, lakers in 5"
 ]
 
 def backfill_bios():
@@ -277,69 +354,76 @@ def backfill_bios():
 ensure_bio_column()
 backfill_bios()
 
-##############################
-# Security Help
+
+### SECURITY HELP
+
+def init_fts(db):
+    db.execute("""
+        INSERT INTO messages_search(content, message_id)
+        SELECT content, id
+        FROM messages
+        WHERE NOT EXISTS (
+            SELECT 1 FROM messages_search
+        )
+    """)
+    db.commit()
+
+def get_csrf_token(request: Request):
+    return request.cookies.get("csrf_token")
+
+def get_current_username(request: Request):
+    user_id = get_current_user_id(request)
+    if not user_id:
+        return None
+
+    db = get_db()
+    user = db.execute(
+        "SELECT username FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+    db.close()
+
+    return user["username"] if user else None
+
+def is_rate_limited(ip, endpoint, limit=10, seconds=60):
+    now = time.time()
+
+    key = f"{ip}:{endpoint}"
+
+    RATE_LIMIT[key] = [
+        t for t in RATE_LIMIT[key]
+        if now - t < seconds
+    ]
+
+    if len(RATE_LIMIT[key]) >= limit:
+        return True
+
+    RATE_LIMIT[key].append(now)
+    return False
 
 def linkify(text):
     if not text:
         return ""
 
-    # Convert markdown safely
-    html_content = markdown.markdown(
-        text,
-        extensions=["extra", "nl2br"]
-    )
+    text = bleach.clean(text, tags=[], strip=True)
 
-    allowed_tags = [
-        'h1', 'h2', 'h3',
-        'p', 'br',
-        'strong', 'em',
-        'ul', 'ol', 'li',
-        'a', 'code', 'pre'
-    ]
-
-    allowed_attrs = {
-        'a': ['href', 'title', 'target', 'rel']
-    }
-
-    # FIRST SANITIZE
-    clean_html = bleach.clean(
-        html_content,
-        tags=allowed_tags,
-        attributes=allowed_attrs,
-        protocols=['http', 'https'],
-        strip=True
-    )
-
-    # Convert URLs into links
-    clean_html = re.sub(
+    text = re.sub(
         r'(https?://[^\s<]+)',
         r'<a href="\1" target="_blank" rel="noopener noreferrer">\1</a>',
-        clean_html
+        text
     )
 
-    # Convert mentions safely
-    clean_html = re.sub(
+    text = re.sub(
         r'@(\w+)',
         r'<a href="/profile/\1">@\1</a>',
-        clean_html
+        text
     )
 
-    # SANITIZE AGAIN AFTER REGEX
-    clean_html = bleach.clean(
-        clean_html,
-        tags=allowed_tags,
-        attributes=allowed_attrs,
-        protocols=['http', 'https'],
-        strip=True
-    )
-
-    return clean_html
+    return markdown.markdown(text, extensions=["nl2br"])
 templates.env.globals.update(linkify=linkify)
 
-#############################
-# Home page
-# Shows all top-level posts safely with pagination
+
+### Home Page and Feed
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request, page: int = 1):
@@ -351,26 +435,56 @@ async def home(request: Request, page: int = 1):
     # The SQL is perfect, but ensure your database has 'username' in the users table
     rows = db.execute("""
     WITH RECURSIVE message_tree AS (
-        SELECT id, id as root_id, timestamp, 0 as depth
-        FROM messages
-        WHERE parent_id IS NULL
+    SELECT 
+        id,
+        id AS root_id,
+        parent_id,
+        timestamp,
+        0 AS depth
+    FROM messages
+    WHERE parent_id IS NULL
 
-        UNION ALL
+    UNION ALL
 
-        SELECT m.id, mt.root_id, m.timestamp, mt.depth + 1
-        FROM messages m
-        JOIN message_tree mt ON m.parent_id = mt.id
+    SELECT 
+        m.id,
+        mt.root_id,
+        m.parent_id,
+        m.timestamp,
+        mt.depth + 1
+    FROM messages m
+    JOIN message_tree mt ON m.parent_id = mt.id
     )
-    SELECT m.*, u.username, mt.depth, mt.root_id
+    SELECT 
+        m.id,
+        m.user_id,
+        m.content,
+        m.timestamp,
+        m.edited_at,
+        m.parent_id,
+        u.username,
+        mt.depth,
+        mt.root_id
     FROM messages m
     JOIN message_tree mt ON m.id = mt.id
     LEFT JOIN users u ON m.user_id = u.id
-    ORDER BY mt.root_id DESC, m.id ASC
+    ORDER BY mt.root_id DESC, mt.depth ASC, m.id ASC
     LIMIT ? OFFSET ?
-""", (limit, offset)).fetchall()
+    """, (limit, offset)).fetchall()
 
     total_row = db.execute("SELECT COUNT(*) FROM messages").fetchone()
     total = total_row[0] if total_row else 0
+    new_rows = []
+
+    for r in rows:
+        r = dict(r)
+        if "depth" not in r:
+            r["depth"] = 0
+        r["username"] = r["username"] or "Deleted User"
+        new_rows.append(r)
+
+    rows = new_rows
+    
     db.close()
     
     # Get the logged-in user from the cookie
@@ -390,23 +504,48 @@ async def home(request: Request, page: int = 1):
         }
     )
 
-###############################
-# LOGIN (SECURE PASSWORD CHECK)
+
+### LOGIN (SECURE PASSWORD CHECK)
 
 @app.get("/login", response_class=HTMLResponse)
 async def login_page(request: Request):
-    return templates.TemplateResponse(
+    csrf_token = request.cookies.get("csrf_token")
+    response = templates.TemplateResponse(
         request=request,
         name="login.html",
-        context=
-        {"request": request,
-          "t": get_translations(request)
+        context={
+            "request": request,
+            "t": get_translations(request),
+            "csrf_token": csrf_token
         }
     )
+    if not csrf_token:
+        new_token = generate_csrf()
+        response.set_cookie(
+            "csrf_token",
+            new_token,
+            httponly=True,
+            samesite="lax"
+        )
+        response.context["csrf_token"] = new_token
+    return response
+
 
 @app.post("/login")
-async def login(username: str = Form(...), password: str = Form(...)):
+@csrf_required
+async def login(
+    request: Request,
+    username: str = Form(...),
+    password: str = Form(...)
+):
     db = get_db()
+    client_ip = request.client.host
+
+    if is_rate_limited(client_ip, "login"):
+        return HTMLResponse(
+            "Too many login attempts. Please wait.",
+            status_code=429
+        )
 
     user = db.execute(
         "SELECT * FROM users WHERE username = ?",
@@ -416,31 +555,25 @@ async def login(username: str = Form(...), password: str = Form(...)):
     db.close()
 
     if not user or not pbkdf2_sha256.verify(password, user["password"]):
-        return HTMLResponse("Invalid login", status_code=401)
+        csrf_token = request.cookies.get("csrf_token")
+        return templates.TemplateResponse(
+            request=request,
+            name="login.html",
+            context={
+                "request": request,
+                "t": get_translations(request),
+                "csrf_token": csrf_token,
+                "error": "Invalid username or password"
+            },
+            status_code=401
+        )
 
     response = RedirectResponse("/", status_code=303)
-
-    signed_user_id = serializer.dumps(user["id"])
-
-    response.set_cookie(
-        "user_id",
-        signed_user_id,
-        httponly=True,
-        samesite="lax",
-        secure=False
-    )
-
-    response.set_cookie(
-        "username",
-        user["username"],
-        httponly=False,
-        samesite="lax"
-    )
-
+    set_auth_cookies(response, user["id"], user["username"])
     return response
 
-##################################
-# Registration
+
+### REGISTER (HASH PASSWORD)
 
 @app.get("/register", response_class=HTMLResponse)
 async def register_page(request: Request):
@@ -458,21 +591,20 @@ async def register_page(request: Request):
     )
 
 @app.post("/register")
-async def register(
-    request: Request,
-    username: str = Form(...),
-    password: str = Form(...),
-    confirm_password: str = Form(...),
-    age: int = Form(...)
-):
+@csrf_required
+async def register(request: Request, username: str = Form(...), password: str = Form(...), confirm_password: str = Form(...), age: int = Form(...)):
 
     username = username.strip()
 
     # Username validation
     if not re.match(r'^[A-Za-z0-9_]{3,20}$', username):
-        return HTMLResponse(
-            "Username must be 3-20 characters and only contain letters, numbers, and underscores.",
-            400
+        return templates.TemplateResponse(
+            "register.html",
+            {
+                "request": request,
+                "error": "Invalid username format"
+            },
+            status_code=400
         )
 
     if password != confirm_password:
@@ -485,18 +617,22 @@ async def register(
     try:
         cur = db.execute(
             """
-            INSERT INTO users (
-                username,
-                password,
-                age
-            )
+            INSERT INTO users (username, password, age)
             VALUES (?, ?, ?)
             """,
             (username, hashed, age)
         )
 
-        db.commit()
+        user_id = cur.lastrowid
 
+        avatar_url = f"https://robohash.org/{username}.png?size=200x200"
+
+        db.execute(
+            "UPDATE users SET avatar = ? WHERE id = ?",
+            (avatar_url, user_id)
+        )
+
+        db.commit()
         user_id = cur.lastrowid
 
     except sqlite3.IntegrityError:
@@ -509,30 +645,19 @@ async def register(
 
     response = RedirectResponse("/", status_code=303)
 
-    response.set_cookie(
-        "user_id",
-        signed_user_id,
-        httponly=True,
-        samesite="lax",
-        secure=False
-    )
-
-    response.set_cookie(
-        "username",
-        username,
-        httponly=False,
-        samesite="lax"
-    )
+    set_auth_cookies(response, user_id, username)
 
     return response
 
-##################################
-# Password Reset Function
+
+### Password Resetting
 
 @app.get("/change_password", response_class=HTMLResponse)
 async def change_password_page(request: Request):
-    return HTMLResponse("""
+    csrf_token = generate_csrf()
+    response = HTMLResponse(f"""
     <form method="post">
+        <input type="hidden" name="csrf_token" value="{csrf_token}">
         <input type="password" name="old_password" placeholder="Old password" required><br>
         <input type="password" name="new_password" placeholder="New password" required><br>
         <input type="password" name="confirm_password" placeholder="Confirm password" required><br>
@@ -540,7 +665,10 @@ async def change_password_page(request: Request):
     </form>
     """)
 
+    response.set_cookie("csrf_token", csrf_token)
+    return response
 @app.post("/change_password")
+@csrf_required
 async def change_password(
     request: Request,
     old_password: str = Form(...),
@@ -577,8 +705,8 @@ async def change_password(
 
     return RedirectResponse("/", 303)
 
-#########################################
-# Profile Stuff
+
+### Profile Viewing
 
 @app.get("/profile/{username}", response_class=HTMLResponse)
 async def view_profile(request: Request, username: str):
@@ -616,11 +744,12 @@ async def view_profile(request: Request, username: str):
             "profile_user": user,
             "messages": messages,
             "user": current_user,
-            "is_own_profile": current_user == user["username"],
+            "is_own_profile": current_user is not None and current_user == user["username"],
             "t": get_translations(request)
         }
     )
 @app.post("/update_profile")
+@csrf_required
 async def update_profile(request: Request, bio: str = Form(...)):
     user_id = get_current_user_id(request)
 
@@ -646,8 +775,8 @@ async def update_profile(request: Request, bio: str = Form(...)):
 
     return RedirectResponse(f"/profile/{username}", 303)
 
-###################################
-# Creating Messages
+
+### Creating Messages
 
 @app.get("/create_message", response_class=HTMLResponse)
 async def create_message_page(request: Request):
@@ -665,6 +794,7 @@ async def create_message_page(request: Request):
         }
     )
 @app.post("/create_message")
+@csrf_required
 async def create_message(
     request: Request,
     content: str = Form(...)
@@ -702,10 +832,41 @@ async def create_message(
 
     return RedirectResponse("/", 303)
 
-######################
-# Deleting Messages
+@app.post("/api/create_message")
+async def api_create_message(request: Request, content: str = Form(...)):
+    user_id = get_current_user_id(request)
 
-@app.get("/delete_message/{msg_id}")
+    if not user_id:
+        return JSONResponse({"error": "not logged in"}, status_code=403)
+
+    db = get_db()
+
+    cur = db.execute(
+        "INSERT INTO messages (user_id, content) VALUES (?, ?)",
+        (user_id, content)
+    )
+
+    msg_id = cur.lastrowid
+
+    db.execute(
+        "INSERT INTO messages_search (content, message_id) VALUES (?, ?)",
+        (content, msg_id)
+    )
+
+    db.commit()
+    db.close()
+
+    return JSONResponse({
+        "id": msg_id,
+        "content": content,
+        "username": request.cookies.get("username")
+    })
+
+
+### Deleting Messages
+
+@app.post("/delete_message/{msg_id}")
+@csrf_required
 async def delete_message(request: Request, msg_id: int):
 
     user_id = get_current_user_id(request)
@@ -729,12 +890,12 @@ async def delete_message(request: Request, msg_id: int):
 
     return RedirectResponse("/", 303)
 
-##########################
-# Editting Messages
+
+### Editing Messages
 
 @app.get("/edit_message/{msg_id}", response_class=HTMLResponse)
 async def edit_message_page(request: Request, msg_id: int):
-    user_id = request.cookies.get("user_id")
+    user_id = get_current_user_id(request)
 
     # must be logged in
     if not user_id:
@@ -765,6 +926,7 @@ async def edit_message_page(request: Request, msg_id: int):
         }
     )
 @app.post("/edit_message/{msg_id}")
+@csrf_required
 async def edit_message(
     msg_id: int,
     request: Request,
@@ -812,26 +974,38 @@ async def edit_message(
 
     return RedirectResponse("/", 303)
 
-###############################
-# Search Function
+
+### Search
 
 @app.get("/search", response_class=HTMLResponse)
 async def search(request: Request, q: str = ""):
+
     if not q.strip():
         return RedirectResponse("/", 303)
 
     db = get_db()
+    init_fts(db)
 
-    # Ensure FTS5 table is populated if this is the first time running
-    count = db.execute("SELECT COUNT(*) FROM messages_search").fetchone()[0]
+    # populate FTS if empty
+    count = db.execute(
+        "SELECT COUNT(*) FROM messages_search"
+    ).fetchone()[0]
+
     if count == 0:
-        db.execute("INSERT INTO messages_search(content, message_id) SELECT content, id FROM messages")
+        db.execute("""
+            INSERT INTO messages_search(content, message_id)
+            SELECT content, id
+            FROM messages
+        """)
         db.commit()
 
+    # sanitize search
     clean_q = re.sub(r'[^a-zA-Z0-9\s]', '', q).strip()
+    clean_q = clean_q.replace('"', '').replace("'", "")
 
     if not clean_q:
         db.close()
+
         return templates.TemplateResponse(
             request=request,
             name="index.html",
@@ -846,30 +1020,137 @@ async def search(request: Request, q: str = ""):
             }
         )
 
-    fts_query = f'"{clean_q}"'
+    fts_query = clean_q
 
     try:
         rows = db.execute("""
-            SELECT m.*, u.username
+
+        WITH RECURSIVE message_tree AS (
+
+            SELECT
+                id,
+                id AS root_id,
+                parent_id,
+                timestamp,
+                0 AS depth
+            FROM messages
+            WHERE parent_id IS NULL
+
+            UNION ALL
+
+            SELECT
+                m.id,
+                mt.root_id,
+                m.parent_id,
+                m.timestamp,
+                mt.depth + 1
             FROM messages m
-            JOIN users u ON m.user_id = u.id
-            WHERE m.id IN (
-                SELECT message_id
-                FROM messages_search
-                WHERE messages_search MATCH ?
-            )
-            ORDER BY m.timestamp DESC
+            JOIN message_tree mt
+                ON m.parent_id = mt.id
+        )
+
+        SELECT
+            m.id,
+            m.user_id,
+            m.content,
+            m.timestamp,
+            m.edited_at,
+            m.parent_id,
+            u.username,
+            mt.depth,
+            mt.root_id
+
+        FROM messages m
+
+        JOIN message_tree mt
+            ON m.id = mt.id
+
+        LEFT JOIN users u
+            ON m.user_id = u.id
+
+        WHERE m.id IN (
+            SELECT message_id
+            FROM messages_search
+            WHERE messages_search MATCH ?
+        )
+
+        ORDER BY
+            mt.root_id DESC,
+            mt.depth ASC,
+            m.id ASC
+
         """, (fts_query,)).fetchall()
+
     except sqlite3.OperationalError:
+
         rows = db.execute("""
-            SELECT m.*, u.username
+
+        WITH RECURSIVE message_tree AS (
+
+            SELECT
+                id,
+                id AS root_id,
+                parent_id,
+                timestamp,
+                0 AS depth
+            FROM messages
+            WHERE parent_id IS NULL
+
+            UNION ALL
+
+            SELECT
+                m.id,
+                mt.root_id,
+                m.parent_id,
+                m.timestamp,
+                mt.depth + 1
             FROM messages m
-            JOIN users u ON m.user_id = u.id
-            WHERE m.content LIKE ?
-            ORDER BY m.timestamp DESC
+            JOIN message_tree mt
+                ON m.parent_id = mt.id
+        )
+
+        SELECT
+            m.id,
+            m.user_id,
+            m.content,
+            m.timestamp,
+            m.edited_at,
+            m.parent_id,
+            u.username,
+            mt.depth,
+            mt.root_id
+
+        FROM messages m
+
+        JOIN message_tree mt
+            ON m.id = mt.id
+
+        LEFT JOIN users u
+            ON m.user_id = u.id
+
+        WHERE m.content LIKE ?
+
+        ORDER BY
+            mt.root_id DESC,
+            mt.depth ASC,
+            m.id ASC
+
         """, (f"%{clean_q}%",)).fetchall()
-    finally:
-        db.close()
+
+    # FIX missing depth crashes
+    new_rows = []
+
+    for r in rows:
+        r = dict(r)
+
+        if "depth" not in r:
+            r["depth"] = 0
+
+        new_rows.append(r)
+
+    rows = new_rows
+
+    db.close()
 
     return templates.TemplateResponse(
         request=request,
@@ -884,8 +1165,9 @@ async def search(request: Request, q: str = ""):
             "t": get_translations(request)
         }
     )
-##################################
-# Reply Function
+
+
+### Reply
 
 @app.get("/message/{msg_id}", response_class=HTMLResponse)
 async def view_message(request: Request, msg_id: int):
@@ -927,6 +1209,7 @@ async def view_message(request: Request, msg_id: int):
         }
     )
 @app.post("/post_reply/{parent_id}")
+@csrf_required
 async def post_reply(
     request: Request,
     parent_id: int,
@@ -974,8 +1257,12 @@ async def post_reply(
 
     except Exception as e:
         db.close()
-        return HTMLResponse(f"Database error: {e}", 500)
+        print("Database error:", e)
 
+        return HTMLResponse(
+            "Internal server error",
+            500
+        )
     db.close()
 
     return RedirectResponse(
@@ -983,21 +1270,37 @@ async def post_reply(
         status_code=303
     )
 
-#################################
-# Logout function
 
-@app.get("/logout")
-async def logout():
+### Logout
 
+@app.get("/logout", response_class=HTMLResponse)
+async def logout_page(request: Request):
+    return templates.TemplateResponse(
+        request=request,
+        name="logout.html",
+        context={
+            "request": request,
+            "user": request.cookies.get("username"),
+            "t": get_translations(request)
+        }
+    )
+
+@app.post("/logout")
+@csrf_required
+async def logout(request: Request):
     response = RedirectResponse("/", 303)
-
     response.delete_cookie("username")
     response.delete_cookie("user_id")
-
+    response.set_cookie(
+        "csrf_token",
+        generate_csrf(),
+        httponly=True,
+        samesite="lax"
+    )
     return response
 
-################################
-# Delete Account Function
+
+### Delete Account
 
 @app.get("/delete_account", response_class=HTMLResponse)
 async def delete_account_confirm(request: Request):
@@ -1024,6 +1327,7 @@ async def delete_account_confirm(request: Request):
     """)
 
 @app.post("/delete_account")
+@csrf_required
 async def delete_account(request: Request):
     user_id = get_current_user_id(request)
     if not user_id:
@@ -1042,6 +1346,12 @@ async def delete_account(request: Request):
     response.delete_cookie("username")
 
     return response
+
+@app.on_event("startup")
+def startup_event():
+    db = get_db()
+    init_fts(db)
+    db.close()
 
 if __name__ == "__main__":
     import uvicorn

@@ -66,11 +66,11 @@ def main():
     for name in USERNAMES:
         if name not in user_map:
             cursor.execute(
-                "INSERT INTO users (username, password, age) VALUES (?, ?, ?)",
-                (name, "test", random.randint(18, 30))
+                "INSERT INTO users (username, password, age, avatar) VALUES (?, ?, ?, ?)",
+                (name, "test", random.randint(18, 30), f"https://robohash.org/{name}.png?size=200x200")
             )
             user_map[name] = cursor.lastrowid
-
+            
     conn.commit()
     print("Users ready.")
 
